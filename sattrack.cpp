@@ -3,6 +3,7 @@
 #include "stdafx.h"
 #include <pthread.h>
 #include <unistd.h>
+#include "lcd.h"
 
 //=============================================================
 //		MAIN
@@ -12,6 +13,10 @@
 // setup for threading access
 VectLook AntTracker;
 VectLook testlook;
+
+char buf[80];
+char upper[16] = {"Az: "};
+char lower[16] = {"El: "};
 
 static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 
@@ -45,10 +50,6 @@ static void *threadFunc(void *arg)
     printf("@@@@@@@EL: %f\n",AntTracker.EL);
     pthread_t whoami=pthread_self();
     printf("who am I %i: \n",whoami);
-
-
-
-
     //sleep(1);
     return NULL;
 }
@@ -60,6 +61,13 @@ char m2[]="Hello 2\n";
 
 int main(int argc, char* argv[])
 {
+
+    lcd_open();
+	lcd_write("Hello from Steve's\nLCD stuff");
+	lcd_clear();
+
+
+
 	cout.setf(ios::fixed);
 	//=== SET CURRENT TIME ==========================
 	struct tm *newtime;								//--- for time now
@@ -129,55 +137,41 @@ int main(int argc, char* argv[])
 		cout<<"=====Observer Look angles============\n"<<testlook; // for antenna tracker
 		cout<<"=====Sat Sub Point===================\n"<<SB;
 
+        lcd_home();
+        if(testlook.EL > 0)
+            lcd_write("Look angles:visible\n");
+        else
+            lcd_write("Look angles:below\n");
 
-		AntTracker.AZ = testlook.AZ;        // in radians
-		AntTracker.EL = testlook.EL;
+		sprintf(buf, "AZ:%6.2f EL:%6.2f", Deg(testlook.AZ), Deg(testlook.EL));
+        lcd_write(buf);
 
-		/************************************************
-            Need a calibrate, 0=north and level.
+        lcd_set_cursor_address(0x14);
+        lcd_write("Sat Lat/long\n");
 
-            Need to take the look angles and
-            position feedback to send motor commands.
-            If elevation is negative, send 0 elevation.
-            Azimuth can track regardless of sign.
-            need to check which quadrant as position pot
-            is not continuous.
-
-            The vector testlook is what is needed for the
-            antenna tracking code.
-
-            typedef struct tag_VectLook
-            {
-                double AZ;	// Azimuth component
-                double EL;	// Elevation component
-                double RG;	// Range component
-            } VectLook;
+        sprintf(buf, "LT:%6.2f LG:%6.2f", Deg(SB.lat), Deg(SB.lon));
+        lcd_write(buf);
 
 
-
-		************************************************/
-
+/**********
         pthread_t t1, t2;
         int loops, sdc;
-
-
         sdc = pthread_create(&t1, NULL, threadFunc, (void*)m1);
         if (sdc != 0)
             printf("erro pthread_create");
-
         sdc = pthread_create(&t2, NULL, threadFunc, (void*)m2);
         if (sdc != 0)
             printf("error pthread_create");
-
         sdc = pthread_join(t1, NULL);
         if (sdc != 0)
             printf("error pthread_join");
-
         sdc = pthread_join(t2, NULL);
         if (sdc != 0)
             printf("error pthread_join");
+*************/
 
-		myEllipse=SatPos1(DeltaT, &Eset);
+
+		//myEllipse=SatPos1(DeltaT, &Eset);
 
 		goal = wait + clock();
 		while( goal > clock() );
@@ -197,7 +191,8 @@ int main(int argc, char* argv[])
 	//while(1);
     //while(!(_kbhit()));
 
-		pthread_exit(NULL);
+		//pthread_exit(NULL);
+		lcd_close();
 
 	return 0;
 }
