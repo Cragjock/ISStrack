@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include "lcd.h"
+#include "pitime.h"
 
 //=============================================================
 //		MAIN
@@ -13,6 +14,16 @@
 // setup for threading access
 VectLook AntTracker;
 VectLook testlook;
+void get_NIST();
+// NIST
+char NL = '\n';
+char EL = '\0';
+int k=0;
+char str_filenm[33];
+
+int (*device_open)(void);
+//char* (*alt_pitime)();
+int (*alt_pitime)(char*);
 
 char buf[80];
 char upper[16] = {"Az: "};
@@ -65,6 +76,7 @@ int main(int argc, char* argv[])
     lcd_open();
 	lcd_write("Hello from Steve's\nLCD stuff");
 	lcd_clear();
+	get_NIST();
 
 
 
@@ -141,7 +153,7 @@ int main(int argc, char* argv[])
         if(testlook.EL > 0)
             lcd_write("Look angles:visible\n");
         else
-            lcd_write("Look angles:below\n");
+            lcd_write("Look angles:below  \n");
 
 		sprintf(buf, "AZ:%6.2f EL:%6.2f", Deg(testlook.AZ), Deg(testlook.EL));
         lcd_write(buf);
@@ -197,3 +209,61 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
+void get_NIST()
+{
+
+//  adding NIST read time code ========
+    char myTime[80]={0};
+    char *mysplit[10];
+    //char *myTest;
+    char *myTest=(char*)malloc(sizeof(char) * 80);
+    char *pch;
+    //char *pch = malloc(sizeof(char) * 80);
+    int sizecheck;
+
+/*** function pointer ***/
+    //sizecheck = buf_pitime(myTime);
+
+    alt_pitime= &buf_pitime;      // This uses socket for NIST
+    //alt_pitime= &no_net_pitime;     // This bypasses socket items but returns a time
+
+    sizecheck = alt_pitime(myTime);
+
+    //char* testtest= pitime();
+
+/*****
+57523 16-05-15 00:58:16 50 0 0 257.3 UTC(NIST) *
+len = 51
+*****/
+
+    //pch = strtok (myTest," ");
+    pch = strtok (myTime," ");
+    //pch = strtok (testtest," ");  // this works
+    while (pch != NULL)
+    {
+        //printf ("%s\n",pch);
+        mysplit[k]= (char*)malloc(strlen(pch+1));
+        strcpy(mysplit[k],pch);
+        pch = strtok (NULL, " ");
+        k++;
+    }
+    // format for LCD
+    strcat(str_filenm,mysplit[7]);      // UTC(NIST)
+    strcat(str_filenm,"\n");
+    strcat(str_filenm,mysplit[2]);      // Time
+    strcat(str_filenm,"\n");
+    strcat(str_filenm,mysplit[1]);      // date
+    printf("strcat %s\n",str_filenm);
+
+    char* mytest1 = myTest+15;
+    *mytest1=NL;
+    char* mytest3=myTest+7;
+
+    char* mytest4= myTest+24;
+    *mytest4=EL;
+
+    myTest[0]=0x20;     // clear the new line from NIST return
+
+    lcd_write(str_filenm);   //NIST
+// ==== NIST end
+}
