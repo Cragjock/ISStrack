@@ -5,13 +5,13 @@
 #include <unistd.h>
 #include "lcd.h"
 #include "pitime.h"
+#include "display.h"
 
 //=============================================================
 //		MAIN
 //=============================================================
 
 
-// setup for threading access
 VectLook AntTracker;
 VectLook testlook;
 void get_NIST();
@@ -25,48 +25,7 @@ int (*device_open)(void);
 //char* (*alt_pitime)();
 int (*alt_pitime)(char*);
 
-char buf[80];
-char upper[16] = {"Az: "};
-char lower[16] = {"El: "};
-
-static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-
-/* Loop 'arg' times incrementing 'glob' */
-static void *threadFunc(void *arg)
-{
-    char* sdcmsg = (char*)arg;
-    printf("%s", sdcmsg);
-
-    int sdc;
-    char buf[80];
-    int j;
-    int loops=1;
-
-    sdc = pthread_mutex_lock(&mtx);
-    if (sdc != 0)
-       printf("error pthread_mutex_lock");
-
-    AntTracker.AZ = Deg(testlook.AZ);        // in radians
-    AntTracker.EL = Deg(testlook.EL);
-
-    //sleep(1);
-    for (j = 0; j < loops; j++)
-        AntTracker.AZ++;
-
-    sdc = pthread_mutex_unlock(&mtx);
-    if (sdc != 0)
-        printf("error pthread_mutex_unlock");
-
-    printf("@@@@@@@AZ: %f\n",AntTracker.AZ);
-    printf("@@@@@@@EL: %f\n",AntTracker.EL);
-    pthread_t whoami=pthread_self();
-    printf("who am I %i: \n",whoami);
-    //sleep(1);
-    return NULL;
-}
-
-char m1[]="Hello 1\n";
-char m2[]="Hello 2\n";
+static int display_count;
 
 
 
@@ -77,8 +36,6 @@ int main(int argc, char* argv[])
 	lcd_write("Hello from Steve's\nLCD stuff");
 	lcd_clear();
 	get_NIST();
-
-
 
 	cout.setf(ios::fixed);
 	//=== SET CURRENT TIME ==========================
@@ -91,7 +48,7 @@ int main(int argc, char* argv[])
 	double sdctime;
 	SATELSET Eset;
 	SATPOS satpos;
-	ELLIPSE myEllipse;
+	//ELLIPSE myEllipse;
 	//double SP,JDG,E2JD,JDN;
 	double JDG,E2JD,JDN;
 	VectorIJK test,test1;           //ptest;
@@ -118,9 +75,6 @@ int main(int argc, char* argv[])
         //cout<<"test_time delta days "<<test_time<<endl;
         test_time*=1440.0;
         //cout<<"test_time delta minutes "<<test_time<<endl;
-
-
-
 
 /**************************************
  local_time minus Eset.dEpochDay matches JDN-E2JD.
@@ -149,48 +103,55 @@ int main(int argc, char* argv[])
 		cout<<"=====Observer Look angles============\n"<<testlook; // for antenna tracker
 		cout<<"=====Sat Sub Point===================\n"<<SB;
 
-        lcd_home();
-        if(testlook.EL > 0)
-            lcd_write("Look angles:visible\n");
-        else
-            lcd_write("Look angles:below  \n");
+/// LCD setup and stuff
 
-		sprintf(buf, "AZ:%6.2f EL:%6.2f", Deg(testlook.AZ), Deg(testlook.EL));
-        lcd_write(buf);
-
-        lcd_set_cursor_address(0x14);
-        lcd_write("Sat Lat/long\n");
-
-        sprintf(buf, "LT:%6.2f LG:%6.2f", Deg(SB.lat), Deg(SB.lon));
-        lcd_write(buf);
+//#define TRACK 0
+//#define LOCATION 1
+//#define SATDATA 2
 
 
-/**********
-        pthread_t t1, t2;
-        int loops, sdc;
-        sdc = pthread_create(&t1, NULL, threadFunc, (void*)m1);
-        if (sdc != 0)
-            printf("erro pthread_create");
-        sdc = pthread_create(&t2, NULL, threadFunc, (void*)m2);
-        if (sdc != 0)
-            printf("error pthread_create");
-        sdc = pthread_join(t1, NULL);
-        if (sdc != 0)
-            printf("error pthread_join");
-        sdc = pthread_join(t2, NULL);
-        if (sdc != 0)
-            printf("error pthread_join");
-*************/
+    if(display_count < 10)
+    {
+        display_control(TRACK, PLACENTIA, SB, Eset, testlook);
+        display_count++;
+
+    }
+
+    else
+    {
+        display_control(LOCATION, PLACENTIA, SB, Eset, testlook);
+        display_count++;
+
+    }
 
 
-		//myEllipse=SatPos1(DeltaT, &Eset);
+    if(display_count > 25)
+        display_count = 0;
+
+        /**
+            ====================
+            Look angles:visible
+            AZ:123456 EL:123456
+            Sat LAT/LONG
+            LT:123456 LG:123456
+            ====================
+            Location Yorba Linda
+            LT:123456 LG:123456
+            Range: 123456
+
+            ====================
+            Tracking:ISS (ZARYA)
+            Incl:12345
+            MM: 123456
+            MA: 123456
+
+        **/
+/// LCD done
 
 		goal = wait + clock();
 		while( goal > clock() );
 
 	}
-
-
 
 	#ifdef __linux__
     	while(1);
@@ -198,7 +159,6 @@ int main(int argc, char* argv[])
         while(!(_kbhit()));
     #else
     #endif
-
 
 	//while(1);
     //while(!(_kbhit()));
