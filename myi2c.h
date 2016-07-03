@@ -15,7 +15,7 @@
 #include <time.h>
 #include <stdint.h>
 #include <linux/swab.h>     // for swab16 will this work ??
-//#include <byteswap.h>       // placeholder to remember for ADS1015 code
+#include <byteswap.h>       // placeholder to remember for ADS1015 code
 
 #define swab16 __swab16 // http://lxr.free-electrons.com/source/include/linux/swab.h#L6
 #define LBYTE(LB) (LB & 0x0FF)
@@ -45,9 +45,9 @@
 #define INTPOL_HIGH 0x02  // interupt polarity
 #define INTPOL_LOW 0x00
 
-#define I2C_SLAVE_ADDRESS     0x20    // device slave address, hard coded
+//#define I2C_SLAVE_ADDRESS     0x20    // device slave address, hard coded
 
-char buf[80];
+//char buf[80];
 typedef unsigned char BYTE;
 char input[5];
 
@@ -60,6 +60,11 @@ int myI2C_write_byte(int file, uint8_t data);
 int32_t myI2C_read_data(int file, uint8_t command);
 
 int all_on(int file);
+
+int myI2C_write_swap(int file, uint8_t command_reg, uint16_t data);
+int16_t myI2C_read_swap(int file, uint8_t command);
+
+
 
 //extern int32_t  i2c_smbus_read_word_data(const struct i2c_client *client, uint8_t command);
 //extern int32_t i2c_smbus_write_word_data(const struct i2c_client *client, uint8_t command, uint16_t value);

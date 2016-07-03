@@ -3,63 +3,50 @@
 #include "stdafx.h"
 #include <pthread.h>
 #include <unistd.h>
+#include "lcd.h"
+#include "pitime.h"
+#include "display.h"
+#include "ads1015.h"
 
 //=============================================================
 //		MAIN
 //=============================================================
 
 
-// setup for threading access
 VectLook AntTracker;
 VectLook testlook;
+void get_NIST();
+// NIST
+char NL = '\n';
+char EL = '\0';
+int k=0;
+char str_filenm[33];
 
-static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+int (*device_open)(void);
+//char* (*alt_pitime)();
+int (*alt_pitime)(char*);
 
-/* Loop 'arg' times incrementing 'glob' */
-static void *threadFunc(void *arg)
-{
-    char* sdcmsg = (char*)arg;
-    printf("%s", sdcmsg);
-
-    int sdc;
-    char buf[80];
-    int j;
-    int loops=1;
-
-    sdc = pthread_mutex_lock(&mtx);
-    if (sdc != 0)
-       printf("error pthread_mutex_lock");
-
-    AntTracker.AZ = Deg(testlook.AZ);        // in radians
-    AntTracker.EL = Deg(testlook.EL);
-
-    //sleep(1);
-    for (j = 0; j < loops; j++)
-        AntTracker.AZ++;
-
-    sdc = pthread_mutex_unlock(&mtx);
-    if (sdc != 0)
-        printf("error pthread_mutex_unlock");
-
-    printf("@@@@@@@AZ: %f\n",AntTracker.AZ);
-    printf("@@@@@@@EL: %f\n",AntTracker.EL);
-    pthread_t whoami=pthread_self();
-    printf("who am I %i: \n",whoami);
-
-
-
-
-    //sleep(1);
-    return NULL;
-}
-
-char m1[]="Hello 1\n";
-char m2[]="Hello 2\n";
+static int display_count;
+float adcresult = 0.3;
+char dis_buf[20];
 
 
 
 int main(int argc, char* argv[])
 {
+
+    int lcdp=lcd_open();
+    int adcp=ADS1015_Init("/dev/i2c-1");
+
+    //adcresult=read_convert_register(adcp);
+    //sprintf(dis_buf, "ADC: %6.3f V", adcresult);
+    //lcd_write(dis_buf);
+
+
+	lcd_write("Hello from Steve's\nLCD stuff");
+	lcd_clear();
+	get_NIST();
+
 	cout.setf(ios::fixed);
 	//=== SET CURRENT TIME ==========================
 	struct tm *newtime;								//--- for time now
@@ -71,7 +58,7 @@ int main(int argc, char* argv[])
 	double sdctime;
 	SATELSET Eset;
 	SATPOS satpos;
-	ELLIPSE myEllipse;
+	//ELLIPSE myEllipse;
 	//double SP,JDG,E2JD,JDN;
 	double JDG,E2JD,JDN;
 	VectorIJK test,test1;           //ptest;
@@ -98,9 +85,6 @@ int main(int argc, char* argv[])
         //cout<<"test_time delta days "<<test_time<<endl;
         test_time*=1440.0;
         //cout<<"test_time delta minutes "<<test_time<<endl;
-
-
-
 
 /**************************************
  local_time minus Eset.dEpochDay matches JDN-E2JD.
@@ -129,62 +113,55 @@ int main(int argc, char* argv[])
 		cout<<"=====Observer Look angles============\n"<<testlook; // for antenna tracker
 		cout<<"=====Sat Sub Point===================\n"<<SB;
 
+/// LCD setup and stuff
 
-		AntTracker.AZ = testlook.AZ;        // in radians
-		AntTracker.EL = testlook.EL;
+    adcresult=read_convert_register(adcp);
+    sprintf(dis_buf, "ADC: %6.3f V", adcresult);
+    lcd_write(dis_buf);
 
-		/************************************************
-            Need a calibrate, 0=north and level.
+//#define TRACK 0
+//#define LOCATION 1
+//#define SATDATA 2
+//#define NIST 3
 
-            Need to take the look angles and
-            position feedback to send motor commands.
-            If elevation is negative, send 0 elevation.
-            Azimuth can track regardless of sign.
-            need to check which quadrant as position pot
-            is not continuous.
+    if(display_count < 5)
+    {
+        display_control(TRACK, PLACENTIA, SB, Eset, testlook);
+        display_count++;
+    }
+    else
+    {
+        display_control(LOCATION, PLACENTIA, SB, Eset, testlook);
+        display_count++;
+    }
 
-            The vector testlook is what is needed for the
-            antenna tracking code.
+    if(display_count > 10)
+        display_count = 0;
 
-            typedef struct tag_VectLook
-            {
-                double AZ;	// Azimuth component
-                double EL;	// Elevation component
-                double RG;	// Range component
-            } VectLook;
+        /**
+            ====================
+            Look angles:visible
+            AZ:123456 EL:123456
+            Sat LAT/LONG
+            LT:123456 LG:123456
+            ====================
+            Location Yorba Linda
+            LT:123456 LG:123456
+            Range: 123456
 
+            ====================
+            Tracking:ISS (ZARYA)
+            Incl:12345
+            MM: 123456
+            MA: 123456
 
-
-		************************************************/
-
-        pthread_t t1, t2;
-        int loops, sdc;
-
-
-        sdc = pthread_create(&t1, NULL, threadFunc, (void*)m1);
-        if (sdc != 0)
-            printf("erro pthread_create");
-
-        sdc = pthread_create(&t2, NULL, threadFunc, (void*)m2);
-        if (sdc != 0)
-            printf("error pthread_create");
-
-        sdc = pthread_join(t1, NULL);
-        if (sdc != 0)
-            printf("error pthread_join");
-
-        sdc = pthread_join(t2, NULL);
-        if (sdc != 0)
-            printf("error pthread_join");
-
-		myEllipse=SatPos1(DeltaT, &Eset);
+        **/
+/// LCD done
 
 		goal = wait + clock();
 		while( goal > clock() );
 
 	}
-
-
 
 	#ifdef __linux__
     	while(1);
@@ -193,12 +170,70 @@ int main(int argc, char* argv[])
     #else
     #endif
 
-
 	//while(1);
     //while(!(_kbhit()));
 
-		pthread_exit(NULL);
+		//pthread_exit(NULL);
+		lcd_close();
 
 	return 0;
 }
 
+void get_NIST()
+{
+
+//  adding NIST read time code ========
+    char myTime[80]={0};
+    char *mysplit[10];
+    //char *myTest;
+    char *myTest=(char*)malloc(sizeof(char) * 80);
+    char *pch;
+    //char *pch = malloc(sizeof(char) * 80);
+    int sizecheck;
+
+/*** function pointer ***/
+    //sizecheck = buf_pitime(myTime);
+
+    alt_pitime= &buf_pitime;      // This uses socket for NIST
+    //alt_pitime= &no_net_pitime;     // This bypasses socket items but returns a time
+
+    sizecheck = alt_pitime(myTime);
+
+    //char* testtest= pitime();
+
+/*****
+57523 16-05-15 00:58:16 50 0 0 257.3 UTC(NIST) *
+len = 51
+*****/
+
+    //pch = strtok (myTest," ");
+    pch = strtok (myTime," ");
+    //pch = strtok (testtest," ");  // this works
+    while (pch != NULL)
+    {
+        //printf ("%s\n",pch);
+        mysplit[k]= (char*)malloc(strlen(pch+1));
+        strcpy(mysplit[k],pch);
+        pch = strtok (NULL, " ");
+        k++;
+    }
+    // format for LCD
+    strcat(str_filenm,mysplit[7]);      // UTC(NIST)
+    strcat(str_filenm,"\n");
+    strcat(str_filenm,mysplit[2]);      // Time
+    strcat(str_filenm,"\n");
+    strcat(str_filenm,mysplit[1]);      // date
+    printf("strcat %s\n",str_filenm);
+
+    char* mytest1 = myTest+15;
+    *mytest1=NL;
+    char* mytest3=myTest+7;
+
+    char* mytest4= myTest+24;
+    *mytest4=EL;
+
+    myTest[0]=0x20;     // clear the new line from NIST return
+
+    lcd_write(str_filenm);   //NIST
+// ==== NIST end
+}
