@@ -96,8 +96,55 @@ extern "C"
 
 #define SIGN_MASK 0x8000     // bit 12 test
 
+
+
+/** For PCA **/
+///#define I2C_SLAVE_ADDRESS     0x40    // device slave address, hard coded
+
 #define MODE1           0x00
 #define MODE2           0x01
+#define SUBADR1         0x02
+#define SUBADR2         0x03
+#define SUBADR3         0x04
+#define ALLCALLADR      0x05
+#define LED0_ON_L       0x06    // low byte LSB
+#define LED0_ON_H       0x07    // high byte MSB
+#define LED0_OFF_L      0x08
+#define LED0_OFF_H      0x09
+#define ALL_LED_ON_L    0xFA
+#define ALL_LED_ON_H    0xFB
+#define ALL_LED_OFF_L   0xFC
+#define ALL_LED_OFF_H   0xFD
+#define PRESCALE        0xFE
+/*****************************/
+/*****   bit patterns    *****/
+#define RESTART         0x80    // MODE 1 reg
+#define SLEEP_ON        0x10    // want this set to 1 for normal operations,a 0 to load prescale,  MODE 1 reg
+#define SLEEP_OFF       0x00
+#define ALLCALL         0x01    // want this set to 1,  MODE 1 reg
+#define OCH             0x08    // MODE 2 reg
+#define INVRT           0x10    // want this to be a 0, MODE 2 reg
+#define OUTDRV          0x04    // want this set to 1,  MODE 2 reg
+#define PRESCALE_50HZ   0X79    // REG FE
+#define PRESCALE_60HZ   0X64    // REG FE
+#define AUTOINCREMENET  0x10    // MODE 1 bit 5= on sets auto-increment
+#define EXTCLOCK        0xBF
+#define SWRST           0x00
+#define COUNTPERPERIOD  4095
+typedef struct _PCA9685
+    {
+        int bus_address;
+        int file;
+        int reg_number;
+        unsigned short Lbyte;
+        unsigned short Ubyte;
+        unsigned char MODE1_data;
+        unsigned char MODE2_data;
+        int frequency;
+        int Pprescale;
+    }PCA9685;
+
+
 
 //char buf[10];
 typedef unsigned short int UINT;
@@ -140,6 +187,13 @@ int I2C_Open(int bus, int addr);
 void I2C_Close(int filep);
 int16_t myI2C_read_swap(int file, uint8_t command);
 int myI2C_write_swap(int file, uint8_t command_reg, uint16_t data);
+
+int PCA9685_start(int);
+int set_all(int name, int start_count, int stop_count);
+int set_count(int name, int channel, int start_count, int stop_count);
+int PCA_Init(const char* devname);
+int set_count(int file, int channel, int start_count, int stop_count);
+
 
 #endif //
 //==============================================

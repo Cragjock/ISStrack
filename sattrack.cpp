@@ -38,6 +38,10 @@ int main(int argc, char* argv[])
     int lcdp=lcd_open();
     int adcp=ADS1015_Init("/dev/i2c-1");
 
+    PCA9685 myPCA={0x40, 0, 69, 0, 0, 0x11, 0x4, 50, 0x79,}; // control structure
+    myPCA.file=PCA_Init("/dev/i2c-1");
+    PCA9685_start(myPCA.file);
+
     //adcresult=read_convert_register(adcp);
     //sprintf(dis_buf, "ADC: %6.3f V", adcresult);
     //lcd_write(dis_buf);
@@ -112,6 +116,15 @@ int main(int argc, char* argv[])
 		cout<<"=====Observer ECI====================\n"<<test1;
 		cout<<"=====Observer Look angles============\n"<<testlook; // for antenna tracker
 		cout<<"=====Sat Sub Point===================\n"<<SB;
+
+
+
+
+    int s_count=read_convert_register(adcp);
+    set_count(myPCA.file, 0, 5, s_count); // file channel, start count, end count
+
+
+
 
 /// LCD setup and stuff
 

@@ -42,6 +42,7 @@ myADS1015 arrADC[4]=  {
 
 //const char * i2cdev[2] = {"/dev/ic2-0","/dev/i2c-1"};
 static int slave_address = 0x48;
+static int P_slave_address = 0x40;
 uint16_t init_config_reg = 0;
 
 
@@ -171,8 +172,6 @@ int ADS1015_op_init(int file)   // maybe not needed
 float read_convert_register(int file)
 {
 
-//do
-//{
     //SINT result = 23; // BS number
     int16_t result = 0x1234; // due to __s32 i2c_smbus_read_word_data(int file, __u8 command)
     int16_t result_sw = 0x7893;
@@ -198,19 +197,186 @@ float read_convert_register(int file)
     printf("the voltage (x1) is: %2.3f\n", (float)result/1000);
     float fresult = (float)result/1000;
 
-    //float PCAcount = ((float)result/1000*80)+320;
-    //printf("Test equation for servo count: %2.3i\n", (int)PCAcount);
+    float PCAcount = ((float)result/1000*80)+320;
+    printf("Test equation for servo count: %2.3f\n", PCAcount);
 
     //result=i2c_smbus_read_word_data(file, Config_Reg); not needed
     //result = myI2C_read_swap(file, Config_Reg);
     //printf("the config register is: x%x\n", result);
 
-//    sleep(2);
-
-//}
-//while(1);
-    return fresult;
+    //return fresult; //this returns voltage
+    return PCAcount; //this returns servo count for a given voltage
 }
+
+
+/**************************************
+    Initialize bus and ADC
+**************************************/
+int PCA_Init(const char* devname)
+{
+    int file= I2C_Open(1, P_slave_address);
+    //file = open(devname, O_RDWR);
+
+
+
+    return file;
+}
+
+int set_count(int file, int channel, int start_count, int stop_count)
+{
+
+    int Myrec=0;
+    int LEDchannel=channel;
+    LEDchannel= (4*channel);
+    //printf("setcount LEDchannel is 0x%02X\n", LEDchannel);
+
+    char LH_lowbyte=LBYTE(start_count);
+    char LH_highbyte=HBYTE(start_count);
+    char HL_lowbyte=LBYTE(stop_count);
+    char HL_highbyte=HBYTE(stop_count);
+
+    i2c_smbus_write_byte_data(file,LED0_ON_L + LEDchannel,LH_lowbyte);   // reset Mode1 to before
+    i2c_smbus_write_byte_data(file,LED0_ON_H + LEDchannel,LH_highbyte);   // reset Mode1 to before
+    i2c_smbus_write_byte_data(file,LED0_OFF_L + LEDchannel,HL_lowbyte);   // reset Mode1 to before
+    Myrec=i2c_smbus_write_byte_data(file,LED0_OFF_H + LEDchannel,HL_highbyte);   // reset Mode1 to before
+    //printf("setcount Bytes written is 0%d\n", Myrec);
+
+    return 0;
+
+}
+
+
+
+
+
+int set_all(int file, int start_count, int stop_count)
+{
+
+    char LH_lowbyte=LBYTE(start_count);
+    char LH_highbyte=HBYTE(start_count);
+    char HL_lowbyte=LBYTE(stop_count);
+    char HL_highbyte=HBYTE(stop_count);
+
+    buf[0] = ALL_LED_ON_L;
+    buf[1] = 0xc;                   // 0000 1100
+    buf[2] = ALL_LED_ON_H;
+    buf[3] = 0x04;                  // 0000 0100
+    buf[4] = ALL_LED_OFF_L;
+    buf[5] = 0xbc;                  // 1011 1100
+    buf[6] = ALL_LED_OFF_H;
+    buf[7] = 0x2;                   // 0000 0010
+
+    buf[1]= LH_lowbyte;     //lowtohigh[0];
+    buf[3]= LH_highbyte;      //hightolow[0];
+    buf[5]= HL_lowbyte;     //lowtohigh[0];
+    buf[7]= HL_highbyte;     //hightolow[0];
+
+//    int MyMode1=i2c_smbus_read_byte_data(file, MODE1);    // result in MyMode1
+
+    int Myrec= write(file, buf, 2);
+    Myrec= write(file, buf+2, 2);
+    Myrec= write(file, buf+4, 2);
+    Myrec= write(file, buf+6, 2);
+
+    printf("Bytes written is 0%d\n", Myrec);
+    return 0;
+
+}
+
+int PCA9685_start(int file)
+{
+    int good=set_all(file, 0, 0);
+
+
+/*********************************************
+    playing to see if it sticks?
+*********************************************/
+    buf[0]=MODE1;
+    buf[1]=1;
+    i2c_smbus_write_byte_data(file,MODE1,buf[1]);
+    //int Myrec= write(file, buf, 2);
+
+
+/********************************************
+    Want MODE2 OUTDRV to be set to on.
+    LED set to to totem pole output
+    Bit 2 = 1 (0x04)
+    Ideal MODE 2 should be 0000 0100
+    Should I read mode2 &0 then or 0x04?
+********************************************/
+    int MyMode2=i2c_smbus_read_byte_data(file, MODE2);    // result in MyMode2
+    printf("current Mode 2 data: 0x%02X\n",MyMode2);
+    int play = MyMode2 | OUTDRV;        // OUTDRV 0x04 0100
+    buf[0]= MyMode2 | OUTDRV;
+    MyMode2 = i2c_smbus_write_byte_data(file,MODE2,buf[0]);   // send OUTDRV on
+    printf("Mode 2 data with OUTDRV set, bit 2: 0x%02X\n", buf);
+
+
+
+/********************************************
+    Want EXTCLK to be 0,use internal clock.
+
+    Ideal MODE 1 is 0000 0001
+                    R00S 0001
+    RESTART
+        if sleep set to 1, restart will be set to 1.
+        to clear, set SLEEP=0, wait 500us, then
+        write a 1 to RESTART. Then restart = 0.
+
+    SLEEP
+        0 = normal mode, sleep off
+        1 = low power or sleep on, needed to update pre-scale
+********************************************/
+    int MyMode1=i2c_smbus_read_byte_data(file, MODE1);
+    printf("current Mode 1 data: 0x%02X\n",MyMode1);
+    play= MyMode1 & EXTCLOCK;           // EXTCLOCK 0xBF  1011 1111, maybe use x81 1000 0001 ?
+    play= MyMode1 & 0x81;           // clear all but RESTART and ALLCALL
+    play= MyMode1 | SLEEP_ON;       // Now, set SLEEP on
+    buf[0]= (MyMode1 & 0x81) | SLEEP_ON;
+    // buf[0]= MyMode1 & EXTCLOCK;     //
+    i2c_smbus_write_byte_data(file,MODE1,buf[0]);
+    printf("Mode 1 should be x000 0101 0x%02X\n", buf);
+    //printf("Mode 1 data with EXTCLOCK off, use internal, bit 6: 0x%02X\n", buf);
+
+/** SLEEP should be on, so set PRESCALE    **/
+    buf[0]=PRESCALE;
+    buf[1]= 0x79;       // hard code pre-scale to 121, 50 hz; 64h for 60 hz
+    //int MyModeS= MyMode1 | SLEEP_ON;        // SLEEP_ON 0x10
+    //i2c_smbus_write_byte_data(file,MODE1,MyModeS);
+    i2c_smbus_write_byte_data(file,PRESCALE,buf);
+    write(file, buf, 2);
+    printf("=========================\n");
+
+/**
+Now, check RESTART, should be = 1. If = 1, then clear sleep.
+Then wait 500 us.
+Then, write a 1 to RESTART to clear to a 0.
+**/
+    MyMode1=i2c_smbus_read_byte_data(file, MODE1);
+
+   // while(MyMode1 < 0x80)
+   //     printf("RESTART not set to 1 yet");
+    buf[0]=MODE1;
+    buf[1]= MyMode1 & 0xEF; // 1110 1111
+    i2c_smbus_write_byte_data(file,MODE1,buf[0]);
+    write(file, buf, 2);
+    // ================ wait 500us
+    buf[0]=MODE1;
+    buf[1]= buf[1] | 0x80;
+    i2c_smbus_write_byte_data(file,MODE1,buf[0]);
+    write(file, buf, 2);
+
+    //MyModeS= MyMode1 | SLEEP_OFF;
+    //i2c_smbus_write_byte_data(file,MODE1,MyModeS);
+return 0;
+
+
+}
+
+
+
+
+
 
 /*******************************************************************/
 //int I2C_Open(int bus, int addr)
