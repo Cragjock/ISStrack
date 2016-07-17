@@ -120,7 +120,7 @@ int main(int argc, char* argv[])
 
 
 
-    int s_count=read_convert_register(adcp);
+    int s_count=read_convert_register_count(adcp);
     set_count(myPCA.file, 0, 5, s_count); // file channel, start count, end count
 
 
@@ -128,9 +128,20 @@ int main(int argc, char* argv[])
 
 /// LCD setup and stuff
 
-    adcresult=read_convert_register(adcp);
+    adcresult=read_convert_register_volts(adcp);
     sprintf(dis_buf, "ADC: %6.3f V", adcresult);
     lcd_write(dis_buf);
+
+    double aztovolts = (Deg(testlook.AZ)) * (3.2/360.0);
+
+    double wtf = aztovolts - adcresult; /// double - float
+
+    printf("volts: %6.3f V\n",adcresult);
+    printf("AZ: %6.3f \n",Deg(testlook.AZ));
+    printf("az to volts: %6.3f V\n",aztovolts);
+    printf("delta: %6.3f \n",wtf);
+
+
 
 //#define TRACK 0
 //#define LOCATION 1

@@ -181,7 +181,11 @@ enum _menuitems
 
 UINT read_config_reg(int);
 int ADS1015_Init(const char* devname);
-float read_convert_register(int);
+float read_convert_register_count(int);
+float read_convert_register_volts(int);
+
+
+
 int ADS1015_op_init(int file);
 int I2C_Open(int bus, int addr);
 void I2C_Close(int filep);

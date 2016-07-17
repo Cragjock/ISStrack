@@ -87,8 +87,15 @@ int ADS1015_Init(const char* devname)
     int file= I2C_Open(1, slave_address);
     //file = open(devname, O_RDWR);
 
-    init_config_reg = mux_diff_1 | PGA_4096 | DR_250sps | MODE_CONTINUOUS | COMP_QUE_DISABLE;
+    //init_config_reg = mux_diff_1 | PGA_4096 | DR_250sps | MODE_CONTINUOUS | COMP_QUE_DISABLE;
     /// should be 0x0223
+
+    init_config_reg = mux_single_1 | PGA_4096 | DR_250sps | MODE_CONTINUOUS | COMP_QUE_DISABLE;
+
+    //#define mux_single_1 0x4000    /// Ain_p=Ain0 & Ain_n=gnd
+
+
+
     myI2C_write_swap(file, Config_Reg, init_config_reg);
 
     return file;
@@ -169,7 +176,7 @@ int ADS1015_op_init(int file)   // maybe not needed
 
 
 /**< KEEP THIS ************** */
-float read_convert_register(int file)
+float read_convert_register_count(int file)
 {
 
     //SINT result = 23; // BS number
@@ -197,7 +204,9 @@ float read_convert_register(int file)
     printf("the voltage (x1) is: %2.3f\n", (float)result/1000);
     float fresult = (float)result/1000;
 
-    float PCAcount = ((float)result/1000*80)+320;
+    //float PCAcount = ((float)result/1000*80)+320;   ///this is for -1.6 t0 1.6 Vin
+    float PCAcount = ((float)result/1000*80)+200;   ///this is for  0 - 3.2 Vin
+
     printf("Test equation for servo count: %2.3f\n", PCAcount);
 
     //result=i2c_smbus_read_word_data(file, Config_Reg); not needed
@@ -207,6 +216,52 @@ float read_convert_register(int file)
     //return fresult; //this returns voltage
     return PCAcount; //this returns servo count for a given voltage
 }
+
+
+/**< KEEP THIS ************** */
+float read_convert_register_volts(int file)
+{
+
+    //SINT result = 23; // BS number
+    int16_t result = 0x1234; // due to __s32 i2c_smbus_read_word_data(int file, __u8 command)
+    int16_t result_sw = 0x7893;
+    uint16_t result1= 0x8312; // BS data
+
+    //result = i2c_smbus_read_word_data(file, Convert_Reg);       // read the data
+    result = myI2C_read_swap(file, Convert_Reg);                // read the data
+    printf("raw convert register count is: 0x%x\n", result);
+
+    /************************************
+        conversion is:
+        (conversion register count)/16 (right shift 4 bits)
+        then times the gain, this gives volt count times 1000
+        then divide 1000 to set decimal place correctly
+    ************************************/
+
+    // check if negative
+    if((result & SIGN_MASK) == SIGN_MASK)
+        result = -(~(result)+1);
+
+    result = (result>>4)*2;         // assumes gain is 2
+    printf("===================");
+    printf("the voltage (x1) is: %2.3f\n", (float)result/1000);
+    float fresult = (float)result/1000;
+
+    //float PCAcount = ((float)result/1000*80)+320;   ///this is for -1.6 t0 1.6 Vin
+    float PCAcount = ((float)result/1000*80)+200;   ///this is for  0 - 3.2 Vin
+
+    printf("Test equation for servo count: %2.3f\n", PCAcount);
+
+    //result=i2c_smbus_read_word_data(file, Config_Reg); not needed
+    //result = myI2C_read_swap(file, Config_Reg);
+    //printf("the config register is: x%x\n", result);
+
+    return fresult; //this returns voltage
+
+}
+
+
+
 
 
 /**************************************
