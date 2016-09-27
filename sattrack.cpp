@@ -6,6 +6,7 @@
 #include "lcd.h"
 #include "pitime.h"
 #include "display.h"
+#include "ads1015.h"
 
 //=============================================================
 //		MAIN
@@ -26,13 +27,26 @@ int (*device_open)(void);
 int (*alt_pitime)(char*);
 
 static int display_count;
+float adcresult = 0.3;
+char dis_buf[20];
 
 
 
 int main(int argc, char* argv[])
 {
 
-    lcd_open();
+    int lcdp=lcd_open();
+    int adcp=ADS1015_Init("/dev/i2c-1");
+
+    PCA9685 myPCA={0x40, 0, 69, 0, 0, 0x11, 0x4, 50, 0x79,}; // control structure
+    myPCA.file=PCA_Init("/dev/i2c-1");
+    PCA9685_start(myPCA.file);
+
+    //adcresult=read_convert_register(adcp);
+    //sprintf(dis_buf, "ADC: %6.3f V", adcresult);
+    //lcd_write(dis_buf);
+
+
 	lcd_write("Hello from Steve's\nLCD stuff");
 	lcd_clear();
 	get_NIST();
@@ -103,29 +117,74 @@ int main(int argc, char* argv[])
 		cout<<"=====Observer Look angles============\n"<<testlook; // for antenna tracker
 		cout<<"=====Sat Sub Point===================\n"<<SB;
 
+
+
+/// used before
+    //int s_count=read_convert_register_count(adcp);
+    //set_count(myPCA.file, 0, 5, s_count); // file channel, start count, end count
+
+
+
+
 /// LCD setup and stuff
+
+    adcresult=read_convert_register_volts(adcp);
+    sprintf(dis_buf, "ADC: %6.3f V", adcresult);
+    lcd_write(dis_buf);
+
+    /// aztovolts is the target reference position
+    double aztovolts = (Deg(testlook.AZ)) * (3.2/360.0);
+
+    /// wtf is the difference of the pot input, adcresults, and reference
+    double wtf = aztovolts - adcresult; /// double - float
+
+    printf("\nVOLTS: %6.3f V\n",adcresult);
+    printf("AZ: %6.3f \n",Deg(testlook.AZ));
+    printf("az to volts: %6.3f V\n",aztovolts);
+    printf("DELTA: %6.3f \n",wtf);
+
+    /**
+    volts   0       1.6     3.2
+    count   200     320     450
+            max left    no motion   max right
+            1 ms    1.5 ms  2ms
+            50 hz timing
+    **/
+
+    /// for applying delta Vin
+    //float PCAcount = (wtf*80)+320;   ///this is for  0 - 3.2 Vin
+    float PCAcount = (wtf*80)+340;   ///this is for  0 - 3.2 Vin, 340 from measurements
+
+    if(wtf< -1.25)
+        PCAcount = 240;
+    else if(wtf> 1.25)
+            PCAcount = 425;
+
+
+    //set_count(myPCA.file, 0, 5, PCAcount); // file channel, start count, end count
+    set_count(myPCA.file, 0, 1, PCAcount); // file channel, start count, end count
+
+    printf("MOTOR count: %6.3f \n",PCAcount);
+
+
 
 //#define TRACK 0
 //#define LOCATION 1
 //#define SATDATA 2
+//#define NIST 3
 
-
-    if(display_count < 10)
+    if(display_count < 5)
     {
         display_control(TRACK, PLACENTIA, SB, Eset, testlook);
         display_count++;
-
     }
-
     else
     {
         display_control(LOCATION, PLACENTIA, SB, Eset, testlook);
         display_count++;
-
     }
 
-
-    if(display_count > 25)
+    if(display_count > 10)
         display_count = 0;
 
         /**

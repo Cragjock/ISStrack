@@ -4,6 +4,7 @@
 static int slave_address = 0x20;
 static int file;
 const char * i2cdev[2] = {"/dev/ic2-0","/dev/i2c-1"};
+static char buf[80];
 
 int i = 0xFF;   // just set it
 
@@ -163,6 +164,45 @@ int myI2C_write_byte(int file, uint8_t data)
 }
 
 /************************************************/
+
+
+
+int myI2C_write_swap(int file, uint8_t command_reg, uint16_t data)
+{
+    /** use the byte swap header **/
+    uint16_t data_swap = bswap_16(data);
+
+    printf("write swap: data in: %x, data swapped: %x\n", data, data_swap);
+
+    int res = i2c_smbus_write_word_data(file, command_reg, data_swap);
+    /** S Addr Wr [A] Comm [A] DataLow [A] DataHigh [A] P **/
+    if (res<0)
+    {
+        printf("result i2c write error");
+        return -1;
+    }
+    return 0;
+}
+
+/***********************************************************/
+int16_t myI2C_read_swap(int file, uint8_t command)
+{
+        int16_t res = i2c_smbus_read_word_data(file, command);
+        /** S Addr Wr [A] Comm [A] S Addr Rd [A] [DataLow] A [DataHigh] NA P **/
+        if (res == -1)
+        {
+            printf("Read error");
+            return -1;
+        }
+
+        /** use the byte swap header **/
+        uint16_t res_swap = bswap_16(res);
+        printf("read swap: data in: %x, data swapped: %x\n", res, res_swap);
+
+        return res_swap;      // return the read data
+}
+
+
 
 
 int all_on(int file)

@@ -34,6 +34,7 @@ char upper[16] = {"Az: "};
 char lower[16] = {"El: "};
 
 /// LCD setup and stuff
+extern void get_NIST();
 
 
 int display_control(int item_to_do,
@@ -144,6 +145,12 @@ int display_control(int item_to_do,
             cout<<row3<<endl;
             cout<<row4<<endl;
             lcd_write(ddram_data);
+        }
+        break;
+
+        case NIST:
+        {
+            get_NIST();
         }
         break;
 

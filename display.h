@@ -8,6 +8,7 @@
 #define TRACK 0
 #define LOCATION 1
 #define SATDATA 2
+#define NIST 3
 
 int display_control(int item_to_do, Observer Obs,
                     SATSUB SS,
