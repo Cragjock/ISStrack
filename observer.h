@@ -3,6 +3,9 @@
 #ifndef _OBSERVER_H
 #define _OBSERVER_H
 
+//#include <cmath>
+//#include "constants.h"
+
 
 typedef struct tag_VectorPQ
 	{

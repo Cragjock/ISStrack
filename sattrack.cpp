@@ -10,17 +10,18 @@
 #include "display.h"
 #include "ads1015.h"
 
-#define GPIO_INTERRUPT_PIN 26   // was 26
+#define SW_GPIO_INTERRUPT_PIN 16   // for switch
+#define GPIO_INTERRUPT_PIN 26   // for LED
 
 //=============================================================
 //		MAIN
 //=============================================================
 
 
-int mcp23s17_enable_interrupts();
-int mcp23s17_disable_interrupts();
-int LED_on();
-int LED_off();
+int mcp23s17_enable_interrupts(int GPIO_ID);
+int mcp23s17_disable_interrupts(int GPIO_ID);
+int LED_on(int GPIO_ID);
+int LED_off(int GPIO_ID);
 
 VectLook AntTracker;
 VectLook testlook;
@@ -49,6 +50,8 @@ bool ctrl_c_pressed = false;
 int main(int argc, char* argv[])
 {
 
+
+ 	#ifdef __linux__
  	struct sigaction sig_struct;
 	sig_struct.sa_handler = sig_handler;
 	sig_struct.sa_flags = 0;
@@ -59,21 +62,21 @@ int main(int argc, char* argv[])
 		cout << "Problem with sigaction" << endl;
 		exit(1);
 	}
+	#endif // __linux__
 
 
-
-    myFP = fopen(netname, "a+");
-    if(myFP == NULL)
-        {
-        cout<<"ERROR opening"<<endl;
-        exit(1);
-        }
-
-
-    fread(read_buf, 1, 100, myFP);
-    int buffersize = strlen(read_buf);
-    fclose(myFP);
-    cout<<"read the file: "<<read_buf<<endl;
+/// ===    File read needed if moving something from PC to here
+//    myFP = fopen(netname, "a+");
+//    if(myFP == NULL)
+//        {
+//        cout<<"ERROR opening"<<endl;
+//        exit(1);
+//        }
+//    fread(read_buf, 1, 100, myFP);
+//    int buffersize = strlen(read_buf);
+//    fclose(myFP);
+//    cout<<"read the file: "<<read_buf<<endl;
+// =============================================================
 
     int lcdp=lcd_open();
     int adcp=ADS1015_Init("/dev/i2c-1");
@@ -91,7 +94,8 @@ int main(int argc, char* argv[])
 	lcd_clear();
 	get_NIST();
 
-	mcp23s17_enable_interrupts();
+	mcp23s17_enable_interrupts(GPIO_INTERRUPT_PIN);
+	//mcp23s17_enable_interrupts(SW_GPIO_INTERRUPT_PIN);
 
 	cout.setf(ios::fixed);
 	//=== SET CURRENT TIME ==========================
@@ -219,13 +223,13 @@ int main(int argc, char* argv[])
     {
         display_control(TRACK, PLACENTIA, SB, Eset, testlook);
         display_count++;
-        LED_off();
+        LED_off(GPIO_INTERRUPT_PIN);
     }
     else
     {
         display_control(LOCATION, PLACENTIA, SB, Eset, testlook);
         display_count++;
-        LED_on();
+        LED_on(GPIO_INTERRUPT_PIN);
     }
 
     if(display_count > 10)
@@ -256,21 +260,25 @@ int main(int argc, char* argv[])
 		goal = wait + clock();
 		while( goal > clock() );
 
+        #ifdef __linux__
+        if(ctrl_c_pressed)
+            {
+                cout << "Ctrl^C Pressed" << endl;
+                cout << "unexporting pins" << endl;
+                //gpio26->unexport_gpio();
+                //gpio16->unexport_gpio();
+                mcp23s17_disable_interrupts(GPIO_INTERRUPT_PIN);
+                //mcp23s17_disable_interrupts(SW_GPIO_INTERRUPT_PIN);
 
-			 if(ctrl_c_pressed)
-				    {
-				    	cout << "Ctrl^C Pressed" << endl;
-				    	cout << "unexporting pins" << endl;
-				    	//gpio26->unexport_gpio();
-				    	//gpio16->unexport_gpio();
-				    	cout << "deallocating GPIO Objects" << endl;
-				    	//delete gpio26;
-				    	//gpio26 = 0;
-				    	//delete gpio16;
-				    	//gpio16 =0;
-				    	break;
+                cout << "deallocating GPIO Objects" << endl;
+                //delete gpio26;
+                //gpio26 = 0;
+                //delete gpio16;
+                //gpio16 =0;
+                break;
 
-				    }
+            }
+        #endif // __linux__
 	}
 
 	#ifdef __linux__
@@ -284,7 +292,8 @@ int main(int argc, char* argv[])
     //while(!(_kbhit()));
 
 		//pthread_exit(NULL);
-		lcd_close();
+		set_all(myPCA.file, 0, 0);      /// kill the servos
+		lcd_close();                    /// kill the LCD
 
 	return 0;
 }
@@ -350,7 +359,7 @@ len = 51
 
 
 
-int mcp23s17_enable_interrupts()
+int mcp23s17_enable_interrupts(int GPIO_ID)
 {
     int fd, len;
     char str_gpio[3];
@@ -359,11 +368,11 @@ int mcp23s17_enable_interrupts()
     if ((fd = open("/sys/class/gpio/export", O_WRONLY)) < 0)
         return -1;
     printf("IN INIT EXPORT ~~~ \n");
-    len = snprintf(str_gpio, sizeof(str_gpio), "%d", GPIO_INTERRUPT_PIN);
+    len = snprintf(str_gpio, sizeof(str_gpio), "%d", GPIO_ID);
     write(fd, str_gpio, len);
     close(fd);
 
-    snprintf(str_filenm, sizeof(str_filenm), "/sys/class/gpio/gpio%d/direction", GPIO_INTERRUPT_PIN);
+    snprintf(str_filenm, sizeof(str_filenm), "/sys/class/gpio/gpio%d/direction", GPIO_ID);
     if ((fd = open(str_filenm, O_WRONLY)) < 0)
         return -1;
     printf("IN INIT OUT~~~ \n");
@@ -378,7 +387,7 @@ int mcp23s17_enable_interrupts()
     close(fd);
 **/
 
-    snprintf(str_filenm, sizeof(str_filenm), "/sys/class/gpio/gpio%d/value", GPIO_INTERRUPT_PIN);
+    snprintf(str_filenm, sizeof(str_filenm), "/sys/class/gpio/gpio%d/value", GPIO_ID);
     if ((fd = open(str_filenm, O_WRONLY)) < 0)
         return -1;
     printf("IN INIT~~ LED ON ~~~ \n");
@@ -388,7 +397,7 @@ int mcp23s17_enable_interrupts()
     return 0;
 }
 
-int mcp23s17_disable_interrupts()
+int mcp23s17_disable_interrupts(int GPIO_ID)
 {
     int fd, len;
     char str_gpio[3];
@@ -396,7 +405,7 @@ int mcp23s17_disable_interrupts()
     if ((fd = open("/sys/class/gpio/unexport", O_WRONLY)) < 0)
         return -1;
 
-    len = snprintf(str_gpio, sizeof(str_gpio), "%d", GPIO_INTERRUPT_PIN);
+    len = snprintf(str_gpio, sizeof(str_gpio), "%d", GPIO_ID);
     write(fd, str_gpio, len);
     close(fd);
 
@@ -405,18 +414,16 @@ int mcp23s17_disable_interrupts()
 
 
 
-int LED_on()
+int LED_on(int GPIO_ID)
 {
     int fd, len;
     char str_gpio[3];
     char str_filenm[33];
-
-
-    snprintf(str_filenm, sizeof(str_filenm), "/sys/class/gpio/gpio%d/value", GPIO_INTERRUPT_PIN);
+    snprintf(str_filenm, sizeof(str_filenm), "/sys/class/gpio/gpio%d/value", GPIO_ID);
     if ((fd = open(str_filenm, O_WRONLY)) < 0)
         return -1;
     printf("LED ON ~~~ \n");
-    write(fd, "1", 1);
+    write(fd, "1", 1);      // this write turns the LED on
     close(fd);
 
     return 0;
@@ -424,18 +431,16 @@ int LED_on()
 
 
 
-int LED_off()
+int LED_off(int GPIO_ID)
 {
     int fd, len;
     char str_gpio[3];
     char str_filenm[33];
-
-
-    snprintf(str_filenm, sizeof(str_filenm), "/sys/class/gpio/gpio%d/value", GPIO_INTERRUPT_PIN);
+    snprintf(str_filenm, sizeof(str_filenm), "/sys/class/gpio/gpio%d/value", GPIO_ID);
     if ((fd = open(str_filenm, O_WRONLY)) < 0)
         return -1;
     printf("LED OFF ~~~ \n");
-    write(fd, "0", 1);
+    write(fd, "0", 1);      // this write turns the LED off
     close(fd);
 
     return 0;

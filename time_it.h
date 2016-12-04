@@ -1,8 +1,12 @@
 
 
-#include <time.h>
+//#include <time.h>
 #ifndef _TIME_IT_H
 #define _TIME_IT_H
+
+#include <math.h>
+#include <ctime>
+#include "constants.h"
 
 
 double frac_of_day(double hr, double min, double sec);		// Fraction of a day
