@@ -1,5 +1,8 @@
 
-#include "stdafx.h"
+//#include "stdafx.h"
+#include "tle_read.h"
+
+
 
 int Read_TLE(char* file, SATELSET &eset)
 {

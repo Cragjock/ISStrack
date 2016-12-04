@@ -2,6 +2,13 @@
 #ifndef _TLE_READ_H
 #define _TLE_READ_H
 
+using namespace std;
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <cmath>
+#include <cstdlib>
+#include "constants.h"
 
 //=========================================
 //	Structure for capturing data from the

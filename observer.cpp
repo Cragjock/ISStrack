@@ -1,6 +1,7 @@
 
 
 #include "stdafx.h"
+//#include "observer.h"
 
 //==========================================================================
 //		Calculate Observer x,y,z in ECI.
