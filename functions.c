@@ -395,7 +395,7 @@ int PCA9685_start(int file)
 
 /** SLEEP should be on, so set PRESCALE    **/
     buf[0]=PRESCALE;
-    buf[1]= 0x79;       // hard code pre-scale to 121, 50 hz; 64h for 60 hz
+    buf[1]= 0x84;       // hard code pre-scale to 121, 50 hz; 64h for 60 hz x84 based on Bitscoep measuring
     //int MyModeS= MyMode1 | SLEEP_ON;        // SLEEP_ON 0x10
     //i2c_smbus_write_byte_data(file,MODE1,MyModeS);
     i2c_smbus_write_byte_data(file,PRESCALE,buf);

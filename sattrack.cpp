@@ -50,7 +50,6 @@ bool ctrl_c_pressed = false;
 int main(int argc, char* argv[])
 {
 
-
  	#ifdef __linux__
  	struct sigaction sig_struct;
 	sig_struct.sa_handler = sig_handler;
@@ -184,9 +183,9 @@ int main(int argc, char* argv[])
     /// wtf is the difference of the pot input, adcresults, and reference
     double wtf = aztovolts - adcresult; /// double - float
 
-    printf("\nVOLTS: %6.3f V\n",adcresult);
-    printf("AZ: %6.3f \n",Deg(testlook.AZ));
-    printf("az to volts: %6.3f V\n",aztovolts);
+    printf("\nVOLTS ADC: %6.3f V\n",adcresult);
+    printf("AZ Degrees: %6.3f \n",Deg(testlook.AZ));
+    printf("AZ to volts: %6.3f V\n",aztovolts);
     printf("DELTA: %6.3f \n",wtf);
 
     /**
@@ -199,7 +198,7 @@ int main(int argc, char* argv[])
 
     /// for applying delta Vin
     //float PCAcount = (wtf*80)+320;   ///this is for  0 - 3.2 Vin
-    float PCAcount = (wtf*80)+340;   ///this is for  0 - 3.2 Vin, 340 from measurements
+    float PCAcount = (wtf*80)+300;   ///this is for  0 - 3.2 Vin, 340 from measurements
 
     if(wtf< -1.25)
         PCAcount = 240;
@@ -209,6 +208,7 @@ int main(int argc, char* argv[])
 
     //set_count(myPCA.file, 0, 5, PCAcount); // file channel, start count, end count
     set_count(myPCA.file, 0, 1, PCAcount); // file channel, start count, end count
+    //set_count(myPCA.file, 1, 1, PCAcount); // file channel, start count, end count
 
     printf("MOTOR count: %6.3f \n",PCAcount);
 
@@ -391,7 +391,7 @@ int mcp23s17_enable_interrupts(int GPIO_ID)
     if ((fd = open(str_filenm, O_WRONLY)) < 0)
         return -1;
     printf("IN INIT~~ LED ON ~~~ \n");
-    write(fd, "1", 1);
+    write(fd, "1", 1); /// writes a 1 to turn on LED
     close(fd);
 
     return 0;
